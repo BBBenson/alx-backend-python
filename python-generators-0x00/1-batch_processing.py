@@ -28,14 +28,21 @@ def stream_users_in_batches(batch_size):
 
         cursor.close()
         connection.close()
+        return
 
     except Error as e:
         print(f"Error streaming users in batches: {e}")
+        return
 
 
 def batch_processing(batch_size):
     """Processes each batch to filter users over the age of 25"""
-    for batch in stream_users_in_batches(batch_size):
-        for user in batch:
-            if user['age'] > 25:
-                print(user)
+    try:
+        for batch in stream_users_in_batches(batch_size):
+            for user in batch:
+                if user['age'] > 25:
+                    print(user)
+        return
+    except Exception as e:
+        print(f"Error in batch processing: {e}")
+        return
