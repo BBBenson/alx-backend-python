@@ -1,5 +1,6 @@
 import mysql.connector
 
+
 def stream_users_in_batches(batch_size):
     """Generator that fetches rows in batches from the user_data table"""
     connection = mysql.connector.connect(
@@ -13,13 +14,13 @@ def stream_users_in_batches(batch_size):
     cursor.execute("SELECT * FROM user_data")
 
     batch = []
-    for row in cursor:
+    for row in cursor:  # 1st loop
         batch.append(row)
         if len(batch) == batch_size:
             yield batch
             batch = []
 
-    if batch:
+    if batch:  # yield remaining rows
         yield batch
 
     cursor.close()
@@ -28,7 +29,7 @@ def stream_users_in_batches(batch_size):
 
 def batch_processing(batch_size):
     """Processes each batch to filter users over the age of 25"""
-    for batch in stream_users_in_batches(batch_size):
-        for user in batch:
+    for batch in stream_users_in_batches(batch_size):  # 2nd loop
+        for user in batch:  # 3rd loop
             if user['age'] > 25:
                 print(user)
