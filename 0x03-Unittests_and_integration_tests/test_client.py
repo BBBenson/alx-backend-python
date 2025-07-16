@@ -4,7 +4,6 @@ import unittest
 from unittest.mock import patch, PropertyMock
 from parameterized import parameterized, parameterized_class
 
-# add fallback for relative import if needed
 try:
     from client import GithubOrgClient
     from fixtures import TEST_PAYLOAD
@@ -17,7 +16,7 @@ except ModuleNotFoundError:
 
 
 class TestGithubOrgClient(unittest.TestCase):
-    """Tests for GithubOrgClient"""
+    """Unit tests for GithubOrgClient"""
 
     @parameterized.expand([
         ("google",),
