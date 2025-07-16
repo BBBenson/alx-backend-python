@@ -3,8 +3,13 @@
 import unittest
 from unittest.mock import patch, PropertyMock, Mock
 from parameterized import parameterized, parameterized_class
-import requests
 from typing import Dict, List
+import requests
+import sys
+import os
+
+# Ensure current dir is in sys.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from client import GithubOrgClient
 from fixtures import TEST_PAYLOAD
@@ -44,8 +49,10 @@ class TestGithubOrgClient(unittest.TestCase):
         ) as mock_url:
             mock_url.return_value = "http://some.url"
             client_instance = GithubOrgClient("google")
-            self.assertEqual(client_instance.public_repos(),
-                             TEST_PAYLOAD[0][2])
+            self.assertEqual(
+                client_instance.public_repos(),
+                TEST_PAYLOAD[0][2]
+            )
             mock_url.assert_called_once()
             mock_get_json.assert_called_once()
 
