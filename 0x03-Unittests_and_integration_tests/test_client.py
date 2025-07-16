@@ -3,16 +3,14 @@
 import unittest
 from unittest.mock import patch, PropertyMock
 from parameterized import parameterized, parameterized_class
+import sys
+import os
 
-try:
-    from client import GithubOrgClient
-    from fixtures import TEST_PAYLOAD
-except ModuleNotFoundError:
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from client import GithubOrgClient
-    from fixtures import TEST_PAYLOAD
+# ensure current dir is in sys.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from client import GithubOrgClient
+from fixtures import TEST_PAYLOAD
 
 
 class TestGithubOrgClient(unittest.TestCase):
@@ -101,3 +99,7 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         self.assertEqual(
             client.public_repos(license="apache-2.0"), self.apache2_repos
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
