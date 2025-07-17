@@ -7,11 +7,11 @@ from parameterized import parameterized, parameterized_class
 import sys
 import os
 
-# Ensure current dir is in sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from client import GithubOrgClient
 from fixtures import TEST_PAYLOAD
+
+# Ensure current dir is in sys.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestGithubOrgClient(unittest.TestCase):
@@ -37,7 +37,9 @@ class TestGithubOrgClient(unittest.TestCase):
     @patch.object(GithubOrgClient, "org", new_callable=PropertyMock)
     def test_public_repos_url(self, mock_org):
         """Test that _public_repos_url returns the correct URL."""
-        test_payload = {"repos_url": "https://api.github.com/orgs/test_org/repos"}
+        test_payload = {
+            "repos_url": "https://api.github.com/orgs/test_org/repos"
+        }
         mock_org.return_value = test_payload
 
         client = GithubOrgClient("google")
