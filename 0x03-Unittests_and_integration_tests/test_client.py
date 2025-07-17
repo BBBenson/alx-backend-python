@@ -6,7 +6,7 @@ from parameterized import parameterized
 import sys
 import os
 
-# Add current dir to path
+# Add current dir to path for relative imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from client import GithubOrgClient
@@ -21,10 +21,7 @@ class TestGithubOrgClient(unittest.TestCase):
     ])
     @patch("client.get_json")
     def test_org(self, org_name, mock_get_json):
-        """
-        Test that GithubOrgClient.org returns the correct payload
-        and calls get_json once with the correct URL.
-        """
+        """Test that GithubOrgClient.org returns the expected payload"""
         expected_payload = {"login": org_name}
         mock_get_json.return_value = expected_payload
 
