@@ -41,6 +41,20 @@ INSTALLED_APPS = [
     'chats',
 ]
 
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    # Default permission: only authenticated users can access APIs
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    # Default authentication: use session authentication & token auth
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
+
+
 AUTH_USER_MODEL = 'chats.User'
 
 MIDDLEWARE = [
