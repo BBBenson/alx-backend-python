@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django_filters',
     'rest_framework',
     'chats',
+    'rest_framework_simplejwt'
 ]
 
 # Django REST Framework settings
