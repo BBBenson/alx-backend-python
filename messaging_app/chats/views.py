@@ -4,6 +4,7 @@ from django_filters import rest_framework as filters
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+from .permissions import IsOwnerOrParticipant
 
 
 # Conversation filters if needed
@@ -42,6 +43,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
+    permission_classes = [IsOwnerOrParticipant]
 
     def create(self, request, *args, **kwargs):
         """
