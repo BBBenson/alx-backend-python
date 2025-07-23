@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from django_filters import rest_framework as filters
 from django.shortcuts import get_object_or_404
 
@@ -38,12 +39,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create conversation
-        conversation = Conversation.objects.create()
         participants_data = request.data.get('participants', [])
 
-        # Add current user if not already included
+        # Include current user always
         participant_ids = {request.user.id} | {p['user_id'] for p in participants_data}
+
+        if not participant_ids:
+            raise PermissionDenied("You must include at least yourself as a participant.")
+
+        conversation = Conversation.objects.create()
         conversation.participants.set(participant_ids)
         conversation.save()
 
@@ -76,12 +80,12 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        conversation_id = serializer.validated_data.get('conversation').conversation_id
-        conversation = get_object_or_404(
-            Conversation,
-            conversation_id=conversation_id,
-            participants=request.user
-        )
+        conversation = serializer.validated_data.get('conversation')
+        conversation = get_object_or_404(Conversation, conversation_id=conversation.conversation_id)
+
+        # Explicitly check if user is a participant
+        if not conversation.participants.filter(id=request.user.id).exists():
+            raise PermissionDenied("You are not a participant in this conversation.")
 
         message = Message.objects.create(
             conversation=conversation,
