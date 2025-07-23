@@ -1,6 +1,5 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
 from django_filters import rest_framework as filters
 from django.shortcuts import get_object_or_404
 
@@ -40,12 +39,13 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         participants_data = request.data.get('participants', [])
-
-        # Include current user always
         participant_ids = {request.user.id} | {p['user_id'] for p in participants_data}
 
         if not participant_ids:
-            raise PermissionDenied("You must include at least yourself as a participant.")
+            return Response(
+                {"detail": "You must include at least yourself as a participant."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         conversation = Conversation.objects.create()
         conversation.participants.set(participant_ids)
@@ -85,7 +85,10 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # Explicitly check if user is a participant
         if not conversation.participants.filter(id=request.user.id).exists():
-            raise PermissionDenied("You are not a participant in this conversation.")
+            return Response(
+                {"detail": "You are not a participant in this conversation."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         message = Message.objects.create(
             conversation=conversation,
