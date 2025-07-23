@@ -34,3 +34,24 @@ class RestrictAccessByTimeMiddleware:
             )
         response = self.get_response(request)
         return response
+
+
+class RolepermissionMiddleware:
+    """
+    Middleware to enforce user role permissions.
+    Only users with role 'admin' or 'moderator' are allowed.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            # Assuming user role is stored in `user.role`
+            user_role = getattr(request.user, 'role', None)
+            if user_role not in ('admin', 'moderator'):
+                return HttpResponseForbidden(
+                    "<h1>Access forbidden: Insufficient role permissions</h1>"
+                )
+
+        response = self.get_response(request)
+        return response
