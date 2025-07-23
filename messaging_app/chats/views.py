@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsOwnerOrParticipant
+from .pagination import StandardResultsSetPagination
+from .filters import MessageFilter
 
 
 # Conversation filters
@@ -63,9 +65,13 @@ class MessageViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Messages.
     Only participants of the conversation can send/view/edit/delete messages.
+    Supports pagination and filtering.
     """
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrParticipant]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class = MessageFilter
 
     def get_queryset(self):
         # Only messages where the user is a participant of the conversation
