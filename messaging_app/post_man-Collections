@@ -1,176 +1,445 @@
 {
-  "info": {
-    "name": "messaging_app API Tests",
-    "_postman_id": "12345678-90ab-cdef-1234-567890abcdef",
-    "description": "Tests for conversations and messages API with JWT authentication",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Login (JWT)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"username\": \"your_username\",\n    \"password\": \"your_password\"\n}"
-        },
-        "url": {
-          "raw": "http://localhost:8000/api/token/",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "8000",
-          "path": ["api", "token", ""]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 200\", function () {",
-              "    pm.response.to.have.status(200);",
-              "});",
-              "",
-              "var jsonData = pm.response.json();",
-              "pm.environment.set(\"access_token\", jsonData.access);"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Create Conversation",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"participants\": [\n        { \"user_id\": 2 }\n    ]\n}"
-        },
-        "url": {
-          "raw": "http://localhost:8000/api/conversations/",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "8000",
-          "path": ["api", "conversations", ""]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 201\", function () {",
-              "    pm.response.to.have.status(201);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Send Message",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"conversation\": 1,\n    \"message_body\": \"Hello from Postman!\"\n}"
-        },
-        "url": {
-          "raw": "http://localhost:8000/api/messages/",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "8000",
-          "path": ["api", "messages", ""]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 201\", function () {",
-              "    pm.response.to.have.status(201);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Get Conversations (Authorized)",
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
-        ],
-        "url": {
-          "raw": "http://localhost:8000/api/conversations/",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "8000",
-          "path": ["api", "conversations", ""]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 200\", function () {",
-              "    pm.response.to.have.status(200);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Get Conversations (Unauthorized)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:8000/api/conversations/",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "8000",
-          "path": ["api", "conversations", ""]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 401\", function () {",
-              "    pm.response.to.have.status(401);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    }
-  ],
-  "variable": []
+	"info": {
+		"_postman_id": "3e6de57a-eeb6-4ccd-98b1-8c1f5030e0da",
+		"name": "Messaging App API",
+		"description": "The Message API provides endpoints for managing conversations and messages with features like authentication, pagination, filtering, and permission controls. It uses JWT for authentication and follows RESTful principles",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "35338674",
+		"_collection_link": "https://message-api-team.postman.co/workspace/Message-API~d726b9c0-7c1e-40f8-a7a0-2514694420ab/collection/35338674-3e6de57a-eeb6-4ccd-98b1-8c1f5030e0da?action=share&source=collection_link&creator=35338674"
+	},
+	"item": [
+		{
+			"name": "Authentication Test",
+			"item": [
+				{
+					"name": "Get JWT Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response has access token\", function () {\r",
+									"    var jsonData = pm.response.json();\r",
+									"    pm.expect(jsonData.access).to.exist;\r",
+									"    \r",
+									"    // Save the token for future requests\r",
+									"    pm.environment.set(\"token\", jsonData.access);\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"username\": \"kwame\",\r\n    \"password\": \"testpass123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/{{token}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"{{token}}",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Conversation Tests",
+			"item": [
+				{
+					"name": "Create a New Conversation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {\r",
+									"    pm.response.to.have.status(201);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains conversation ID\", function () {\r",
+									"    var jsonData = pm.response.json();\r",
+									"    pm.expect(jsonData.id).to.exist;\r",
+									"    pm.environment.set(\"conversation_id\", jsonData.id);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"participants\": [\r\n        2,\r\n        3\r\n    ] // User IDs of participants\r\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/cnversations/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"cnversations",
+								""
+							]
+						},
+						"description": "### API Endpoint: Retrieve Conversations\n\n**Method:** `GET`  \n**Endpoint:** `{{base_url}}/cnversations/`\n\nThis endpoint is used to retrieve a list of conversations.\n\n#### Request Parameters\n\n- **participants** (array of integers): This parameter specifies the IDs of the participants whose conversations you want to retrieve. In the provided example, the request includes a single participant with an ID of `2`.\n    \n\n#### Expected Response Format\n\nThe response will typically return a JSON object containing an array of conversation details associated with the specified participants. The structure of the response may include properties such as conversation IDs, participant details, and timestamps, depending on the implementation.\n\nEnsure that you provide valid participant IDs in the request to receive the relevant conversation data."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Message Tests",
+			"item": [
+				{
+					"name": "Send a Message",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {\r",
+									"    pm.response.to.have.status(201);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Message was created\", function () {\r",
+									"    var jsonData = pm.response.json();\r",
+									"    pm.expect(jsonData.message_body).to.eql(\"Hello, this is a test message!\");\r",
+									"    pm.environment.set(\"message_id\", jsonData.id);\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"message_body\": \"Hello, this is a test message!\"\r\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/cnversations/{{conversation_id}}/messages/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"cnversations",
+								"{{conversation_id}}",
+								"messages",
+								""
+							]
+						},
+						"description": "## Send Message to Conversation\n\nThis endpoint allows users to send a message to a specific conversation identified by the `conversation_id`. It is designed to facilitate communication within a conversation by posting new messages.\n\n### Request\n\n- **Method:** POST\n    \n- **URL:** `{{base_url}}/cnversations/{{conversation_id}}/messages/`\n    \n\n#### Request Body\n\nThe request must include a JSON payload in the following format:\n\n``` json\n{\n  \"message_body\": \"string\"\n}\n\n ```\n\n- **message_body** (string): The content of the message that you want to send to the conversation. This is a required field.\n    \n\n### Response\n\nUpon a successful request, the API will return a response containing the details of the sent message. The structure of the response may include:\n\n- **message_id**: A unique identifier for the message.\n    \n- **conversation_id**: The ID of the conversation to which the message was sent.\n    \n- **message_body**: The content of the message that was sent.\n    \n- **timestamp**: The time at which the message was sent.\n    \n\nEnsure that you handle any errors that may arise, such as invalid conversation IDs or missing message content."
+					},
+					"response": []
+				},
+				{
+					"name": "List Messages with Pagination",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains pagination data\", function () {\r",
+									"    var jsonData = pm.response.json();\r",
+									"    pm.expect(jsonData.count).to.exist;\r",
+									"    pm.expect(jsonData.results).to.be.an('array');\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/conversations/{{conversation_id}}/messages/?page=1&page_size=5",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								"{{conversation_id}}",
+								"messages",
+								""
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "5"
+								}
+							]
+						},
+						"description": "## Get Messages from Conversation\n\nThis endpoint retrieves messages from a specific conversation identified by `conversation_id`.\n\n### Request Method\n\n- **GET**\n    \n\n### Endpoint\n\n- `{{base_url}}/conversations/{{conversation_id}}/messages/`\n    \n\n### Query Parameters\n\n- `page` (integer): Specifies the page number of the results to retrieve. Default is `1`.\n    \n- `page_size` (integer): Specifies the number of messages to return per page. Default is `5`.\n    \n\n### Expected Response Format\n\nThe response will be in JSON format and will include the details of the messages retrieved for the specified conversation. The structure of the response will typically contain:\n\n- A list of message objects, each containing relevant details such as message content, sender information, and timestamps.\n    \n- Pagination details to assist with navigating through multiple pages of messages.\n    \n\nMake sure to replace `{{conversation_id}}` with the actual ID of the conversation you wish to query."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Permission Tests",
+			"item": [
+				{
+					"name": "Test Unauthorized Access",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401 for unauthorized access\", function () {\r",
+									"    pm.response.to.have.status(401);\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/conversations/{{conversation_id}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								"{{conversation_id}}",
+								""
+							]
+						},
+						"description": "## Test Unauthorized Access\n\nThis endpoint retrieves the details of a specific conversation identified by the `conversation_id`. Verifies that protected endpoints reject requests without valid authentication.\n\n### Request Parameters\n\n- **conversation_id** (path parameter): The unique identifier of the conversation you wish to retrieve. This should be a valid ID corresponding to an existing conversation in the system.\n    \n\n**Test Cases**:  \n\\- Access any protected endpoint without token  \n\\- Expected: 401 Unauthorized  \n\\- Purpose: Ensures security of protected resources\n\n### Response\n\nUpon a successful request, the API will return a JSON object containing the details of the specified conversation. The response will include various attributes related to the conversation, such as its status, participants, and messages.\n\n### Notes\n\n- Ensure that the `conversation_id` provided is valid and exists in the system to avoid errors.\n    \n- The response will be in JSON format, which can be easily parsed for further use."
+					},
+					"response": []
+				},
+				{
+					"name": "Test Access to Other User's Conversation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 for forbidden access\", function () {\r",
+									"    pm.response.to.have.status(403);\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/conversations/{{conversation_id}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								"{{conversation_id}}",
+								""
+							]
+						},
+						"description": "## Test Access to Other User's Conversation\n\nThis endpoint retrieves the details of a specific conversation identified by the `conversation_id`. Verifies that users can only access conversations they participate in.\n\n**Test Flow**:  \n1\\. User A creates a conversation  \n2\\. User B attempts to access User A's conversation  \n3\\. Expected: 403 Forbidden  \n  \n**Purpose**:  \n\\- Validates conversation privacy  \n\\- Ensures proper access control implementation  \n\n#### Test Access to Other User's Conversation\n\n1. First, log in as a different user (e.g., \"ama\")\n    \n2. Try to access the conversation created by \"kwame\"\n    \n\n### Request Parameters\n\n- `conversation_id` (path parameter): A unique identifier for the conversation whose details are being requested. This should be provided in the URL.\n    \n\n### Expected Response\n\nOn a successful request, the API will return a JSON object containing the details of the conversation. The response may include various attributes related to the conversation, such as the title, participants, messages, and timestamps.\n\n### Notes\n\n- Ensure that the `conversation_id` provided is valid and corresponds to an existing conversation in the system.\n    \n- The response will contain relevant information regarding the conversation, which can be used for further processing or display in the client application."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Filtering Tests",
+			"item": [
+				{
+					"name": "Filter Messages by Date Range",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"All messages are within date range\", function () {\r",
+									"    var jsonData = pm.response.json();\r",
+									"    var startDate = new Date(\"2025-07-01\");\r",
+									"    var endDate = new Date(\"2025-07-31T23:59:59\");\r",
+									"    \r",
+									"    jsonData.results.forEach(function(message) {\r",
+									"        var messageDate = new Date(message.sent_at);\r",
+									"        pm.expect(messageDate).to.be.within(startDate, endDate);\r",
+									"    });\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/conversations/{{conversation_id}}/messages/?start_date=2025-07-01&end_date=2025-07-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								"{{conversation_id}}",
+								"messages",
+								""
+							],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2025-07-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-07-31"
+								}
+							]
+						},
+						"description": "### Retrieve Messages from a Conversation\n\nThis endpoint retrieves messages from a specific conversation within a defined date range.\n\n#### Request Parameters\n\n- `conversation_id` (path parameter): The unique identifier of the conversation from which messages are to be retrieved.\n    \n- `start_date` (query parameter): The start date for filtering messages. Format: `YYYY-MM-DD`.\n    \n- `end_date` (query parameter): The end date for filtering messages. Format: `YYYY-MM-DD`.\n    \n\n#### Expected Response\n\nThe response will include a list of messages that fall within the specified date range for the given conversation. Each message object typically contains details such as the message content, sender information, and timestamps.\n\n#### Notes\n\n- Ensure that the `start_date` is before or equal to the `end_date` to avoid errors in the request.\n    \n- The response may be paginated if there are a large number of messages; check the response for pagination details if applicable."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "conversation_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "message_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "other_user_token",
+			"value": "",
+			"type": "string"
+		}
+	]
 }

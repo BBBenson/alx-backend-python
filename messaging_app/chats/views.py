@@ -1,108 +1,233 @@
-from rest_framework import viewsets, status, permissions
+# messaging_app/chats/views.py
+
+"""Viewsets for Conversation and Message models"""
+
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
-from django_filters import rest_framework as filters
-from django.shortcuts import get_object_or_404
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Conversation, Message
-from .serializers import ConversationSerializer, MessageSerializer
-from .permissions import IsOwnerOrParticipant
-from .pagination import StandardResultsSetPagination
 from .filters import MessageFilter
+from .models import Conversation, Message, User
+from .pagination import MessagePagination
+from .permissions import IsMessageOwnerOrReadOnly, IsParticipantOfConversation
+from .serializers import (
+    ConversationDetailSerializer,
+    ConversationListSerializer,
+    CustomTokenObtainPairSerializer,
+    MessageSerializer,
+    UserSerializer,
+)
 
 
-# Conversation filters
-class ConversationFilter(filters.FilterSet):
-    created_at = filters.DateFromToRangeFilter()
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom token obtain view that includes user data in the response
+    """
 
-    class Meta:
-        model = Conversation
-        fields = ['created_at']
+    serializer_class = CustomTokenObtainPairSerializer
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for viewing and editing user accounts.
+    """
+
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "patch", "head", "options"]  # Remove delete
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action == "create":
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        """
+        Filter to only show the current user's profile in list view
+        Non-staff users can only see their own profile
+        """
+        user = self.request.user
+        if user.is_staff:
+            return User.objects.all()
+        return User.objects.filter(pk=user.pk)
+
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        """
+        Retrieve the current user's profile
+        """
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Conversations.
-    Only authenticated users who are participants can access.
+    ViewSet for listing and creating conversations
     """
-    serializer_class = ConversationSerializer
-    filter_backends = (filters.DjangoFilterBackend,)
-    filterset_class = ConversationFilter
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrParticipant]
+
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
+    http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
+    ordering_fields = ["created_at"]
+    ordering = ["-created_at"]
+    search_fields = [
+        "participants__first_name",
+        "participants__last_name",
+        "participants__email",
+    ]
 
     def get_queryset(self):
-        # Only conversations where the user is a participant
-        return Conversation.objects.filter(participants=self.request.user)
+        # Get conversations where current user is a participant
+        return Conversation.objects.filter(
+            participants=self.request.user
+        ).prefetch_related("participants", "messages")
+
+    def get_serializer_class(self) -> type:
+        if self.action == "list":
+            return ConversationListSerializer
+        return ConversationDetailSerializer
 
     def create(self, request, *args, **kwargs):
-        """
-        Create a conversation with participants.
-        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        participants_data = request.data.get('participants', [])
-        participant_ids = {request.user.id} | {p['user_id'] for p in participants_data}
+        # Add current user to participants if not included
+        participants = serializer.validated_data.get("participants", [])
+        if request.user not in participants:
+            participants.append(request.user)
 
-        if not participant_ids:
-            return Response(
-                {"detail": "You must include at least yourself as a participant."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        conversation = Conversation.objects.create()
-        conversation.participants.set(participant_ids)
-        conversation.save()
-
-        headers = self.get_success_headers(serializer.data)
+        conversation = serializer.save(participants=participants)
         return Response(
-            ConversationSerializer(conversation).data,
+            ConversationDetailSerializer(conversation).data,
             status=status.HTTP_201_CREATED,
-            headers=headers
         )
+
+    def get_object(self):
+        """
+        Override to ensure proper permission checking for object retrieval
+        """
+        obj = super().get_object()
+        if not obj.participants.filter(id=self.request.user.id).exists():
+            raise PermissionDenied(
+                "You do not have permission to access this conversation",
+                code=status.HTTP_403_FORBIDDEN,
+            )
+        return obj
 
 
 class MessageViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Messages.
-    Only participants of the conversation can send/view/edit/delete messages.
-    Supports pagination and filtering.
+    ViewSet for listing and creating messages within a conversation
     """
+
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrParticipant]
-    pagination_class = StandardResultsSetPagination
-    filter_backends = (filters.DjangoFilterBackend,)
+    permission_classes = [
+        permissions.IsAuthenticated,
+        IsParticipantOfConversation,
+        IsMessageOwnerOrReadOnly,
+    ]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
     filterset_class = MessageFilter
+    pagination_class = MessagePagination
+    ordering_fields = ["sent_at", "sender__username"]
+    ordering = ["-sent_at"]
+    search_fields = [
+        "message_body",
+        "sender__first_name",
+        "sender__last_name",
+        "sender__username",
+    ]
 
     def get_queryset(self):
-        # Only messages where the user is a participant of the conversation
-        return Message.objects.filter(
-            conversation__participants=self.request.user
-        )
+        # Get conversation ID from URL
+        conversation_id = self.kwargs.get("conversation_id")
 
-    def create(self, request, *args, **kwargs):
-        """
-        Send a message in an existing conversation.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # Verify conversation exists and user is participant
+        try:
+            conversation = Conversation.objects.get(conversation_id=conversation_id)
+        except Conversation.DoesNotExist:
+            raise NotFound("Conversation not found")
 
-        conversation = serializer.validated_data.get('conversation')
-        conversation = get_object_or_404(Conversation, conversation_id=conversation.conversation_id)
-
-        # Explicitly check if user is a participant
-        if not conversation.participants.filter(id=request.user.id).exists():
-            return Response(
-                {"detail": "You are not a participant in this conversation."},
-                status=status.HTTP_403_FORBIDDEN
+        if not conversation.participants.filter(pk=self.request.user.pk).exists():
+            raise PermissionDenied(
+                "You are not a participant in this conversation",
+                code=status.HTTP_403_FORBIDDEN,
             )
 
-        message = Message.objects.create(
-            conversation=conversation,
-            sender=request.user,
-            message_body=serializer.validated_data['message_body']
-        )
+        # Return messages for this conversation with optimized queries
+        queryset = Message.objects.filter(conversation=conversation)
 
-        return Response(
-            MessageSerializer(message).data,
-            status=status.HTTP_201_CREATED
-        )
+        # Apply additional filtering
+        queryset = self.filter_queryset(queryset)
+
+        # Return with related data
+        return queryset.select_related("sender", "conversation").order_by("-sent_at")
+
+    def create(self, request, *args, **kwargs):
+        # Get conversation ID from URL
+        conversation_id = self.kwargs.get("conversation_id")
+
+        # Verify conversation exists and user is participant
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+        except Conversation.DoesNotExist:
+            raise NotFound("Conversation not found")
+
+        if not conversation.participants.filter(id=request.user.id).exists():
+            raise PermissionDenied(
+                "You are not a participant in this conversation",
+                code=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Create message with current user as sender
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        message = serializer.save(sender=request.user, conversation=conversation)
+
+        return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        # Check if user is the message owner
+        if instance.sender != request.user:
+            raise PermissionDenied(
+                "You can only edit your own messages", code=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Check if user is the message owner
+        if instance.sender != request.user:
+            raise PermissionDenied(
+                "You can only delete your own messages", code=status.HTTP_403_FORBIDDEN
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)

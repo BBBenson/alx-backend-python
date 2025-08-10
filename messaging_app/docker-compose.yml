@@ -1,32 +1,54 @@
-version: "3.9"
+version: '3.8'
 
 services:
   db:
     image: mysql:8.0
-    container_name: messaging_db
-    restart: always
-    env_file:
-      - .env
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - "3307:3306"
+      - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql # Persistent volume for database
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
-    container_name: messaging_web
-    restart: always
-    env_file:
-      - .env
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - .:/app
+    restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-development-key-change-in-production
+      - DB_ENGINE=mysql
+      - DB_NAME=${MYSQL_DB}
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles  # Persistent volume for static files
+      - media_volume:/app/media # Persistent volume for media files
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py wait_for_db &&
+             python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py create_test_data || true &&
+             python3 manage.py runserver 0.0.0.0:8000"
 
 volumes:
-  db_data:
+  mysql_data: # Named volume for database persistence
+  static_volume:  # Named volume for static files
+  media_volume: # Named volume for media files
