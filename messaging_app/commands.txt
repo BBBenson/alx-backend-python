@@ -1,0 +1,43 @@
+# Install Ingress Controller
+minikube addons enable ingress
+
+# Verify installation
+kubectl get pods -n ingress-nginx
+
+# Apply Ingress configuration
+kubectl apply -f k8s/ingress.yaml
+
+# Verify Ingress installation
+kubectl get ingress -n messaging
+
+# Update and test locally by adding to /etc/hosts
+echo "$(minikube ip) messaging-app.local" | sudo tee -a /etc/hosts
+
+# Access the application and test endpoints
+curl -I http://messaging-app.local/api/v1/health/
+curl -I http://messaging-app.local/static/
+curl -I http://messaging-app.local/admin/
+
+# Get Minikube IP
+minikube ip
+
+# Add to /etc/hosts
+# <minikube-ip> messaging-app.local
+
+# Apply blue deployment
+kubectl apply -f blue_deployment.yaml
+
+# Apply service
+kubectl apply -f kubeservice.yaml
+
+# Deploy green version
+./kubctl-0x02 deploy green
+
+# Verify green version
+./kubctl-0x02 verify green
+
+# Switch traffic to green
+./kubctl-0x02 switch green
+
+# Rollback to blue if needed
+./kubctl-0x02 rollback

@@ -1,0 +1,148 @@
+#!/bin/bash
+
+# kubctl-0x03 - Rolling Update Script
+# Performs zero-downtime rolling updates and verifies application health
+
+set -euo pipefail
+
+# Configuration
+NAMESPACE="messaging"
+DEPLOYMENT="messaging-app-blue"
+SERVICE="messaging-app-service"
+TEST_URL="http://localhost:8000/health/"  # Using port-forward for reliability
+REQUEST_INTERVAL=0.5  # seconds between test requests
+MAX_ATTEMPTS=60       # maximum number of health check attempts
+LOG_FILE="health_checks.log"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Cleanup function
+cleanup() {
+    echo -e "${BLUE}Cleaning up background processes...${NC}"
+    kill $PORT_FORWARD_PID $HEALTH_PID 2>/dev/null || true
+}
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to run health checks and log results
+run_health_checks() {
+    rm -f $LOG_FILE
+    local count=0
+    
+    echo -e "${BLUE}Starting health checks...${NC}"
+    echo -e "${BLUE}Testing endpoint: ${TEST_URL}${NC}"
+    echo -e "Timestamp,Status" > $LOG_FILE
+    
+    while true; do
+        ((count++))
+        local timestamp=$(date +"%Y-%m-%d %T")
+        if curl -s -f -o /dev/null -w "%{http_code}" "${TEST_URL}" >> /dev/null; then
+            echo -e "${GREEN}✓${NC} Request ${count}: Success"
+            echo "${timestamp},200" >> $LOG_FILE
+        else
+            echo -e "${RED}✗${NC} Request ${count}: Failed"
+            echo "${timestamp},FAILED" >> $LOG_FILE
+        fi
+        sleep ${REQUEST_INTERVAL}
+    done
+}
+
+# Function to check deployment status
+check_deployment_status() {
+    echo -e "${BLUE}Monitoring rollout status...${NC}"
+    kubectl rollout status deployment/${DEPLOYMENT} -n ${NAMESPACE} --timeout=300s
+}
+
+# Function to verify all pods are ready
+verify_pods() {
+    echo -e "${BLUE}Verifying pods...${NC}"
+    kubectl get pods -n ${NAMESPACE} -l app=messaging-app,version=blue -o wide
+    
+    echo -e "\n${BLUE}Pod status details:${NC}"
+    kubectl get pods -n ${NAMESPACE} -l app=messaging-app,version=blue \
+        -o jsonpath='{range .items[*]}{.metadata.name}: {"\t"}Status: {.status.phase}{"\t"}Ready: {.status.conditions[?(@.type=="Ready")].status}{"\t"}Restarts: {.status.containerStatuses[0].restartCount}{"\n"}{end}'
+}
+
+# Analyze health check results
+analyze_health_checks() {
+    echo -e "\n${BLUE}Analyzing health check results...${NC}"
+    local total_requests=$(($(wc -l < $LOG_FILE) - 1))  # Subtract header
+    local failed_requests=$(grep -c "FAILED" $LOG_FILE)
+    
+    if [ "$failed_requests" -gt 0 ]; then
+        echo -e "${RED}Downtime detected: ${failed_requests} failed requests out of ${total_requests}${NC}"
+        return 1
+    else
+        echo -e "${GREEN}No downtime detected: ${total_requests} successful requests${NC}"
+        return 0
+    fi
+}
+
+# Main execution
+main() {
+    trap cleanup EXIT
+    
+    # Check prerequisites
+    if ! command_exists kubectl; then
+        echo -e "${RED}Error: kubectl is not installed${NC}"
+        exit 1
+    fi
+
+    if ! command_exists curl; then
+        echo -e "${RED}Error: curl is not installed${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Starting rolling update process...${NC}"
+    
+    # Get current deployment status
+    echo -e "${BLUE}Current deployment status:${NC}"
+    kubectl get deployments -n ${NAMESPACE} -l app=messaging-app
+    
+    # Setup port-forward
+    echo -e "${BLUE}Starting port-forward to service...${NC}"
+    kubectl port-forward svc/${SERVICE} 8000:8000 -n ${NAMESPACE} > /dev/null &
+    PORT_FORWARD_PID=$!
+    sleep 3  # Allow port-forward to initialize
+
+    # Start health checks
+    run_health_checks &
+    HEALTH_PID=$!
+    
+    # Apply the updated deployment
+    echo -e "\n${BLUE}Applying updated deployment...${NC}"
+    kubectl apply -f blue_deployment.yaml -n ${NAMESPACE}
+    
+    # Monitor the rollout status
+    if check_deployment_status; then
+        echo -e "${GREEN}Rolling update completed successfully!${NC}"
+    else
+        echo -e "${RED}Rolling update failed!${NC}"
+        exit 1
+    fi
+    
+    # Stop health checks
+    kill $HEALTH_PID
+    wait $HEALTH_PID 2>/dev/null
+    
+    # Analyze results
+    analyze_health_checks || true
+    
+    # Verify pods
+    verify_pods
+    
+    # Final status
+    echo -e "\n${GREEN}Rolling update verification complete!${NC}"
+    echo -e "${BLUE}Current deployment status:${NC}"
+    kubectl get deployments -n ${NAMESPACE} -l app=messaging-app -o wide
+}
+
+# Run main function
+main "$@"

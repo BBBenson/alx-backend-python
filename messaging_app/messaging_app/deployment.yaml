@@ -1,0 +1,213 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-app
+  labels:
+    app: messaging-app
+    version: v1.0.0
+spec:
+  replicas: 2
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: messaging-app
+  template:
+    metadata:
+      labels:
+        app: messaging-app
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: messaging-app-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - messaging-app
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: messaging-app
+        image: collekta/messaging-app:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        envFrom:
+        - secretRef:
+            name: messaging-app-secrets
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          value: "messaging_app.settings.production"
+        - name: DATABASE_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@db-service:5432/$(DB_NAME)"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: DJANGO_DEBUG
+          value: "false"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+            scheme: HTTP
+          failureThreshold: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: static-files
+          mountPath: /app/staticfiles
+          readOnly: true
+        - name: media-files
+          mountPath: /app/media
+      volumes:
+      - name: static-files
+        persistentVolumeClaim:
+          claimName: static-files-pvc
+      - name: media-files
+        persistentVolumeClaim:
+          claimName: media-files-pvc
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "messaging-app"
+        effect: "NoSchedule"
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-app-service
+  labels:
+    app: messaging-app
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: messaging-app
+---
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: messaging-app-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: messaging-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: messaging-app-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: "messaging-app"
+---
+# Configuration for non-sensitive settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: messaging-app-config
+data:
+  DJANGO_SETTINGS_MODULE: "messaging_app.settings"
+  DEBUG: "False"
+  DJANGO_ALLOWED_HOSTS: "*"
+  DB_HOST: "db-service"
+  DB_PORT: "5432"
+  # Add any other non-sensitive config here
+---
+# Sensitive configuration (use a secret management system in production)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: messaging-app-secrets
+type: Opaque
+stringData:
+  # These should be managed through a proper secret management system
+  SECRET_KEY: "django-insecure-secret-key"  # Generate a strong key
+  DB_NAME: "messaging_db"
+  DB_USER: "messaging_user"
+  DB_PASSWORD: "messaging_pass"
+  # Add other sensitive data here
