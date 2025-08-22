@@ -45,3 +45,23 @@ jobs:
           cd messaging_app
           python manage.py migrate
           pytest --ds=messaging_app.settings
+
+      - name: Lint with flake8
+        run: |
+          cd messaging_app
+          pip install flake8
+          flake8 .
+
+      - name: Run tests with coverage
+        run: |
+          cd messaging_app
+          pip install coverage pytest-cov
+          coverage run -m pytest --ds=messaging_app.settings
+          coverage report -m
+          coverage xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: messaging_app/coverage.xml
