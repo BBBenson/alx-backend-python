@@ -22,7 +22,7 @@ pipeline {
 
         stage('Install dependencies') {
             steps {
-                sh 'pip install -r messaging_app/requirements.txt'
+                sh 'pip3 install -r messaging_app/requirements.txt'
             }
         }
 
